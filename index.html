@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Bons plans Gaming — Agrégateur</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, Arial;
+      margin: 20px;
+      background: #f7f7f7;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    img.thumb {
+      width: 96px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+    .title {
+      font-weight: 700;
+    }
+    .price {
+      font-size: 1.1rem;
+    }
+    .old {
+      color: #777;
+      text-decoration: line-through;
+      margin-left: 8px;
+    }
+    .source {
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .actions {
+      margin-left: auto;
+    }
+    .filters {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    select, input {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bons plans Gaming</h1>
+  <div class="filters">
+    <select id="platform" style="padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+      <option value="">Toutes plateformes</option>
+      <option value="pc">PC</option>
+      <option value="ps5">PS5</option>
+      <option value="xbox">Xbox</option>
+      <option value="switch">Switch</option>
+    </select>
+    <select id="type" style="padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+      <option value="">Tous types</option>
+      <option value="game">Jeu</option>
+      <option value="dlc">DLC</option>
+      <option value="subscription">Abonnement</option>
+    </select>
+    <input id="q" placeholder="Rechercher (ex: Elden Ring, FIFA...)" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+  </div>
+  <div id="list">Chargement des offres…</div>
+
+<script>
+async function loadDeals() {
+  const listEl = document.getElementById('list');
+  try {
+    const res = await fetch('/deals.json', { cache: "no-store" });
+    if (!res.ok) throw new Error("Impossible de charger deals.json");
+    const data = await res.json();
+    renderDeals(data);
+  } catch (e) {
+    console.error('loadDeals failed:', e);
+    listEl.innerHTML = `
+      <div style="color:#900;padding:12px;background:#fff;border-radius:8px;">
+        <strong>Impossible de charger les offres :</strong><br>
+        <small>${e.message}</small>
+      </div>
+    `;
+  }
+}
+
+function renderDeals(deals) {
+  const q = document.getElementById('q').value.toLowerCase();
+  const platformFilter = document.getElementById('platform').value;
+  const typeFilter = document.getElementById('type').value;
+
+  const container = document.getElementById('list');
+  container.innerHTML = '';
+
+  const filtered = deals.filter(d => {
+    const matchesSearch = !q || (d.title && d.title.toLowerCase().includes(q)) || (d.tags && d.tags.join(' ').toLowerCase().includes(q));
+    const matchesPlatform = !platformFilter || d.platform === platformFilter;
+    const matchesType = !typeFilter || d.type === typeFilter;
+    return matchesSearch && matchesPlatform && matchesType;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p>Aucune offre trouvée.</p>';
+    return;
+  }
+
+  for (const d of filtered) {
+    const discount = d.old_price ? Math.round((d.old_price - d.price) / d.old_price * 100) : 0;
+    const el = document.createElement('div');
+    el.className = 'card row';
+    el.innerHTML = `
+      <img class="thumb" src="${d.image || 'placeholder.png'}" alt="${escapeHtml(d.title)}">
+      <div>
+        <div class="title"><a href="${d.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(d.title)}</a></div>
+        <div style="display: flex; gap: 6px; margin: 4px 0;">
+          ${d.platform ? `<span style="background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${d.platform}</span>` : ''}
+          ${d.type ? `<span style="background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;">${d.type}</span>` : ''}
+        </div>
+        <div class="price">
+          ${d.price ? d.price + '€' : 'Prix inconnu'}
+          ${d.old_price ? `<span class="old">${d.old_price}€</span> <span style="color: #e63946; font-weight: bold;">-${discount}%</span>` : ''}
+        </div>
+        <div class="source">${escapeHtml(d.source)} • ${new Date(d.timestamp).toLocaleString()}</div>
+      </div>
+      <div class="actions"><a href="${d.url}" target="_blank" rel="nofollow noopener">Voir l'offre</a></div>
+    `;
+    container.appendChild(el);
+  }
+}
+
+function escapeHtml(str) {
+  return String(str||'').replace(/[&<>"']/g, s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[s]));
+}
+
+// Écouteurs
+document.getElementById('q').addEventListener('input', loadDeals);
+document.getElementById('platform').addEventListener('change', loadDeals);
+document.getElementById('type').addEventListener('change', loadDeals);
+
+// Chargement initial
+loadDeals();
+</script>
+</body>
+</html>
