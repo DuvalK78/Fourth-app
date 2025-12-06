@@ -1,49 +1,42 @@
-print("Test")
 import requests
 from bs4 import BeautifulSoup
 import json
 import time
 
-# ---------- SCRAPER INSTANT GAMING ----------
 def scrape_instantgaming(url):
     try:
-        html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10).text
-        soup = BeautifulSoup(html, "html.parser")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Arrête si la requête échoue
+
+        soup = BeautifulSoup(response.text, "html.parser")
 
         # Titre
-        title_raw = soup.select_one("h1.product-name")
-        if not title_raw:
-            raise Exception("Titre introuvable")
-        title = title_raw.get_text(strip=True)
+        title_element = soup.select_one("h1.product-name")
+        if not title_element:
+            print("Titre non trouvé")
+            return None
+        title = title_element.get_text(strip=True)
 
         # Prix
-        price_raw = soup.select_one("span.price-new")
-        if not price_raw:
-            raise Exception("Prix introuvable")
-        price = float(
-            price_raw.get_text(strip=True)
-            .replace("€", "")
-            .replace(",", ".")
-            .replace(" ", "")
-        )
+        price_element = soup.select_one("span.price-new")
+        if not price_element:
+            print("Prix non trouvé")
+            return None
+        price = float(price_element.get_text(strip=True).replace("€", "").replace(",", ".").strip())
 
-        # Ancien prix (si dispo)
+        # Ancien prix (optionnel)
         old_price = None
-        old_price_raw = soup.select_one("span.price-old")
-        if old_price_raw:
-            old_price = float(
-                old_price_raw.get_text(strip=True)
-                .replace("€", "")
-                .replace(",", ".")
-                .replace(" ", "")
-            )
+        old_price_element = soup.select_one("span.price-old")
+        if old_price_element:
+            old_price = float(old_price_element.get_text(strip=True).replace("€", "").replace(",", ".").strip())
 
         # Image
-        img = soup.select_one("img.product-image")
-        image_url = img["src"] if img else None
-
-        # Plateforme (ex: PC, PS4, etc.)
-        platform = "pc"  # Par défaut
+        image_element = soup.select_one("img.product-image")
+        image_url = image_element["src"] if image_element else None
 
         return {
             "title": title,
@@ -52,42 +45,34 @@ def scrape_instantgaming(url):
             "timestamp": int(time.time() * 1000),
             "price": price,
             "old_price": old_price,
-            "platform": platform,
+            "platform": "pc",
             "type": "game",
-            "tags": ["gaming", platform, "key"],
+            "tags": ["gaming", "pc", "key"],
             "image": image_url
         }
     except Exception as e:
-        print(f"[ERREUR Instant Gaming] {url} -> {e}")
+        print(f"Erreur lors du scraping de {url}: {e}")
         return None
 
-# ---------- LISTE DES PRODUITS À SCRAPER ----------
+# URLs à scraper
 PRODUCT_URLS = [
     "https://www.instant-gaming.com/fr/1000-elden-ring-pc-jeu-steam/",
     "https://www.instant-gaming.com/fr/1001-fifa-23-ps5-jeu-psn/",
-    # Ajoute d'autres URLs ici
 ]
 
-# ---------- ROUTAGE VERS LE BON SCRAPER ----------
-def scrape_url(url):
-    if "instant-gaming.com" in url:
-        return scrape_instantgaming(url)
-    else:
-        print(f"❌ Aucun scraper pour : {url}")
-        return None
-
-# ---------- MAIN ----------
 def main():
     deals = []
     for url in PRODUCT_URLS:
-        print(f"Scraping : {url}")
-        data = scrape_url(url)
+        print(f"Scraping: {url}")
+        data = scrape_instantgaming(url)
         if data:
             deals.append(data)
+    print(f"Offres trouvées: {len(deals)}")
+
     # Sauvegarde
     with open("deals.json", "w", encoding="utf-8") as f:
         json.dump(deals, f, indent=4, ensure_ascii=False)
-    print("\n✔ Scraping terminé ! deals.json mis à jour.\n")
+    print("Fichier deals.json mis à jour.")
 
 if __name__ == "__main__":
     main()
